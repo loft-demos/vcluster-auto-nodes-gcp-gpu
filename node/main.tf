@@ -15,41 +15,35 @@ resource "random_id" "vm_suffix" {
   byte_length = 4
 }
 
-module "private_instance" {
-  source  = "terraform-google-modules/vm/google//modules/compute_instance"
-  version = "~> 13.0"
-
-  region            = local.region
-  zone              = local.zone == "" ? null : local.zone
-  subnetwork        = local.subnet_name
-  num_instances     = 1
-  hostname          = "${var.vcluster.name}-${random_id.vm_suffix.hex}"
-  instance_template = module.instance_template.self_link
-
-  # Will use NAT
-  access_config = []
+resource "google_compute_instance_from_template" "compute" {
+  name                     = "${var.vcluster.name}-${random_id.vm_suffix.hex}"
+  zone                     = local.zone == "" ? null : local.zone
+  source_instance_template = module.instance_template.self_link
 
   labels = {
-    vcluster  = local.vcluster_name
-    namespace = local.vcluster_namespace
-
-    # the same as the value set in CCM’s --cluster-name flag
-    cluster-name = local.vcluster_name
+    vcluster      = local.vcluster_name
+    namespace     = local.vcluster_namespace
+    cluster-name  = local.vcluster_name
   }
 
-  # ✅ Pass a list (or empty list) – NOT a block
-  guest_accelerator = local.enable_gpu ? [{
-    type  = local.gpu_type          # e.g. "nvidia-tesla-t4" or "nvidia-l4"
-    count = local.gpu_count         # e.g. 1
-  }] : []
+  # Attach GPU only when requested by the NodeType properties
+  dynamic "guest_accelerator" {
+    for_each = local.enable_gpu ? [1] : []
+    content {
+      type  = local.gpu_type      # e.g. "nvidia-tesla-t4" or "nvidia-l4"
+      count = local.gpu_count     # e.g. 1
+    }
+  }
 
-  # ✅ Pass an object (or null) – NOT a block
-  scheduling = local.enable_gpu ? {
-    on_host_maintenance = "TERMINATE"
-    automatic_restart   = true
-    preemptible         = false          # set true if you want Spot
-    # provisioning_model can be omitted or set to null/"SPOT" depending on your use
-  } : null
+  # Required for GPU VMs (no live migration)
+  dynamic "scheduling" {
+    for_each = local.enable_gpu ? [1] : []
+    content {
+      on_host_maintenance = "TERMINATE"
+      automatic_restart   = true
+      preemptible         = false   # set true if you want Spot
+    }
+  }
 }
 
 data "google_project" "project" {
