@@ -83,9 +83,9 @@ module "instance_template" {
   automatic_restart   = true
   preemptible         = false
 
-  # ---- Attach GPU only for GPU NodeTypes ----
-  guest_accelerator = local.enable_gpu ? [{
-    type  = local.gpu_type
-    count = local.gpu_count
+  # <-- This is the correct input name for the instance_template submodule
+  accelerators = local.enable_gpu ? [{
+    accelerator_type  = local.gpu_type
+    accelerator_count = local.gpu_count
   }] : []
 }
