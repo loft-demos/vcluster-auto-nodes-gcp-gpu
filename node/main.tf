@@ -17,7 +17,7 @@ resource "random_id" "vm_suffix" {
 
 resource "google_compute_instance_from_template" "compute" {
   name                     = "${var.vcluster.name}-${random_id.vm_suffix.hex}"
-  zone                     = local.zone == "" ? null : local.zone
+  zone                     = local.selected_zone
   source_instance_template = module.instance_template.self_link
 
   labels = {
