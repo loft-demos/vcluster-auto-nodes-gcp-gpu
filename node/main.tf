@@ -36,6 +36,25 @@ module "private_instance" {
     # the same as the value set in CCM’s --cluster-name flag
     cluster-name = local.vcluster_name
   }
+
+  # ←← Attach GPUs ONLY when enable_gpu=true
+  dynamic "guest_accelerator" {
+    for_each = local.enable_gpu ? [1] : []
+    content {
+      type  = local.gpu_type          # e.g. "nvidia-tesla-t4" or "nvidia-l4"
+      count = local.gpu_count         # e.g. 1
+    }
+  }
+
+  # ←← Required for GPU VMs (no live migration). This overrides the template.
+  dynamic "scheduling" {
+    for_each = local.enable_gpu ? [1] : []
+    content {
+      on_host_maintenance = "TERMINATE"
+      automatic_restart   = true
+      preemptible         = false     # set true if you want Spot
+    }
+  }
 }
 
 data "google_project" "project" {
@@ -77,15 +96,4 @@ module "instance_template" {
   }
 
   startup_script = "#!/bin/bash\n# Ensure cloud-init runs\ncloud-init status --wait || true"
-
-  # ---- GPU-safe scheduling only when a GPU is requested ----
-  on_host_maintenance = local.enable_gpu ? "TERMINATE" : "MIGRATE"
-  automatic_restart   = true
-  preemptible         = false
-
-  # <-- This is the correct input name for the instance_template submodule
-  accelerators = local.enable_gpu ? [{
-    accelerator_type  = local.gpu_type
-    accelerator_count = local.gpu_count
-  }] : []
 }
