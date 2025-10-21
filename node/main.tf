@@ -37,24 +37,19 @@ module "private_instance" {
     cluster-name = local.vcluster_name
   }
 
-  # ←← Attach GPUs ONLY when enable_gpu=true
-  dynamic "guest_accelerator" {
-    for_each = local.enable_gpu ? [1] : []
-    content {
-      type  = local.gpu_type          # e.g. "nvidia-tesla-t4" or "nvidia-l4"
-      count = local.gpu_count         # e.g. 1
-    }
-  }
+  # ✅ Pass a list (or empty list) – NOT a block
+  guest_accelerator = local.enable_gpu ? [{
+    type  = local.gpu_type          # e.g. "nvidia-tesla-t4" or "nvidia-l4"
+    count = local.gpu_count         # e.g. 1
+  }] : []
 
-  # ←← Required for GPU VMs (no live migration). This overrides the template.
-  dynamic "scheduling" {
-    for_each = local.enable_gpu ? [1] : []
-    content {
-      on_host_maintenance = "TERMINATE"
-      automatic_restart   = true
-      preemptible         = false     # set true if you want Spot
-    }
-  }
+  # ✅ Pass an object (or null) – NOT a block
+  scheduling = local.enable_gpu ? {
+    on_host_maintenance = "TERMINATE"
+    automatic_restart   = true
+    preemptible         = false          # set true if you want Spot
+    # provisioning_model can be omitted or set to null/"SPOT" depending on your use
+  } : null
 }
 
 data "google_project" "project" {
