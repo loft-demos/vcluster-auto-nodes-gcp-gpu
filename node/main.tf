@@ -78,8 +78,14 @@ module "instance_template" {
 
   startup_script = "#!/bin/bash\n# Ensure cloud-init runs\ncloud-init status --wait || true"
 
-  # Required for GPU instances (no live migration)
-  on_host_maintenance = "TERMINATE"
-  automatic_restart   = true    # false if using Spot/preemptible
-  preemptible         = false   # true if Spot/preemptible
+  # ---- GPU-safe scheduling only when a GPU is requested ----
+  on_host_maintenance = local.enable_gpu ? "TERMINATE" : "MIGRATE"
+  automatic_restart   = true
+  preemptible         = false
+
+  # ---- Attach GPU only for GPU NodeTypes ----
+  guest_accelerator = local.enable_gpu ? [{
+    type  = local.gpu_type
+    count = local.gpu_count
+  }] : []
 }
