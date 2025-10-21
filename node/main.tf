@@ -77,4 +77,10 @@ module "instance_template" {
   }
 
   startup_script = "#!/bin/bash\n# Ensure cloud-init runs\ncloud-init status --wait || true"
+
+  scheduling = {
+    on_host_maintenance = "TERMINATE"  # Required for GPUs (no live migration)
+    automatic_restart   = true          # Set false if using Spot/Preemptible
+    preemptible         = false
+  }
 }
